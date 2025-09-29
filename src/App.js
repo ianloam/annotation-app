@@ -42,15 +42,20 @@ const theme = createTheme({palette: {
 });
 
 const SIDEBAR_WIDTH = 320;
+
+// Define colors for labels
+const labelColors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dda0dd'];
+
 export default function AnnotationApp() {
   // Main state
   const [drawingMode, setDrawingMode] = useState('pen');
-  const [penMode, setPenMode] = useState('add');
+  const [penMode, setPenMode] = useState('move');
   const [penSize, setPenSize] = useState(10);
-  const [autoLabel, setAutoLabel] = useState(true);
-  const [currentLabel, setCurrentLabel] = useState('Label A');
+
+  const [currentLabel, setCurrentLabel] = useState('');
   const [labels, setLabels] = useState(['Label A', 'Label B', 'Label C']);
   const [crosshairActive, setCrosshairActive] = useState(false);
+  const mainBoxRef = useRef(null);
   const [uploadedImage, setUploadedImage] = useState(null);
   const [annotations, setAnnotations] = useState([]);
   const [exportMenuAnchor, setExportMenuAnchor] = useState(null);
@@ -62,9 +67,9 @@ export default function AnnotationApp() {
   const fileInputRef = useRef(null);
 
   const updateCrosshair = (e) => {
-    if (!crosshairActive || !crosshairRef.current || !mapRef.current) return;
+    if (!crosshairActive || !crosshairRef.current || !mainBoxRef.current) return;
 
-    const rect = mapRef.current.getBoundingClientRect();
+    const rect = mainBoxRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
@@ -88,8 +93,28 @@ export default function AnnotationApp() {
     if (file) setUploadedImage(URL.createObjectURL(file));
   };
 
+  const handleDrop = (event) => {
+    event.preventDefault();
+    const files = event.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/')) {
+        setUploadedImage(URL.createObjectURL(file));
+      }
+    }
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+  };
+
   const handleAnnotationAdd = (annotation) => {
-    setAnnotations(prev => [...prev, annotation]);
+    console.log('App - adding annotation:', annotation);
+    setAnnotations(prev => {
+      const newAnnotations = [...prev, annotation];
+      console.log('App - new annotations state:', newAnnotations);
+      return newAnnotations;
+    });
   };
 
   const handleDeleteSelected = () => {
@@ -98,6 +123,14 @@ export default function AnnotationApp() {
 
   const handleUndo = () => {
     setAnnotations(prev => prev.slice(0, -1));
+  };
+
+  const handleDeleteLabel = (label) => {
+    if (window.confirm(`Are you sure you want to delete label "${label}" and all its annotations?`)) {
+      setLabels(prev => prev.filter(l => l !== label));
+      setAnnotations(prev => prev.filter(a => a.label !== label));
+      if (currentLabel === label) setCurrentLabel('');
+    }
   };
 
   const handleExport = (format) => {
@@ -126,6 +159,7 @@ export default function AnnotationApp() {
         <Sidebar
           SIDEBAR_WIDTH={SIDEBAR_WIDTH}
           fileInputRef={fileInputRef}
+          mapRef={mapRef}
           exportMenuAnchor={exportMenuAnchor}
           setExportMenuAnchor={setExportMenuAnchor}
           optionsMenuAnchor={optionsMenuAnchor}
@@ -144,24 +178,58 @@ export default function AnnotationApp() {
           handleUndo={handleUndo}
           currentLabel={currentLabel}
           setCurrentLabel={setCurrentLabel}
-          autoLabel={autoLabel}
-          setAutoLabel={setAutoLabel}
           labels={labels}
+          setLabels={setLabels}
+          labelColors={labelColors}
+          handleDeleteLabel={handleDeleteLabel}
         />
-        <Box component="main" sx={{ flexGrow: 1, position: 'relative' }}>
+        <Box ref={mainBoxRef} component="main" sx={{ flexGrow: 1, position: 'relative', cursor: crosshairActive ? 'none' : undefined }} onMouseMove={updateCrosshair} onDrop={handleDrop} onDragOver={handleDragOver}>
           <MapView
             mapRef={mapRef}
             crosshairActive={crosshairActive}
-            crosshairRef={crosshairRef}
-            updateCrosshair={updateCrosshair}
             uploadedImage={uploadedImage}
             annotations={annotations}
             onAnnotationAdd={handleAnnotationAdd}
+            onAnnotationsChange={setAnnotations}
             currentLabel={currentLabel}
             penSize={penSize}
             drawingMode={drawingMode}
             penMode={penMode}
+            labels={labels}
+            labelColors={labelColors}
           />
+          {crosshairActive && (
+            <div
+              ref={crosshairRef}
+              style={{
+                position: 'absolute',
+                pointerEvents: 'none',
+                zIndex: 1000,
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '-100vw',
+                  top: '0',
+                  width: '200vw',
+                  height: '2px',
+                  backgroundColor: 'black',
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-100vh',
+                  left: '0',
+                  width: '2px',
+                  height: '200vh',
+                  backgroundColor: 'black',
+                }}
+              />
+            </div>
+          )}
         </Box>
       </Box>
     </ThemeProvider>

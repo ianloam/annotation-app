@@ -13,14 +13,12 @@ import {
   Chip,
   ToggleButton,
   ToggleButtonGroup,
-  Select,
-    FormControl,
   FormControlLabel,
-  InputLabel,
   Accordion,
   AccordionSummary,
   AccordionDetails,
   Badge,
+  Autocomplete,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -29,7 +27,6 @@ import {
   SelectAll as LassoIcon,
   Delete as DeleteIcon,
   Undo as UndoIcon,
-  MergeType as MergeIcon,
   Add as AddIcon,
   Remove as RemoveIcon,
   PanTool as MoveIcon,
@@ -39,11 +36,15 @@ import {
   Flag as FlagIcon,
   Note as NoteIcon,
   ExpandMore as ExpandMoreIcon,
+  NearMe as NearMeIcon,
+  DeleteSweep as DeleteSweepIcon,
+  Label as LabelIcon,
 } from '@mui/icons-material';
 
 export default function Sidebar({
   SIDEBAR_WIDTH,
   fileInputRef,
+  mapRef,
   exportMenuAnchor,
   setExportMenuAnchor,
   optionsMenuAnchor,
@@ -62,9 +63,10 @@ export default function Sidebar({
   handleUndo,
   currentLabel,
   setCurrentLabel,
-  autoLabel,
-  setAutoLabel,
-  labels
+  labels,
+  setLabels,
+  labelColors,
+  handleDeleteLabel
 }) {
   return (
     <Drawer
@@ -244,28 +246,31 @@ export default function Sidebar({
             </Typography>
           </AccordionSummary>
           <AccordionDetails>
-            <ButtonGroup orientation="vertical" fullWidth variant="outlined" size="small">
-              <Button startIcon={<LassoIcon />}>
-                Lasso Select
-              </Button>
-              <Button
-                startIcon={<DeleteIcon />}
-                color="error"
-                onClick={handleDeleteSelected}
-              >
-                Delete All
-              </Button>
-              <Button
-                startIcon={<UndoIcon />}
-                onClick={handleUndo}
-                disabled={annotations.length === 0}
-              >
-                Undo
-              </Button>
-              <Button startIcon={<MergeIcon />}>
-                Merge Selected
-              </Button>
-            </ButtonGroup>
+             <ButtonGroup orientation="vertical" fullWidth variant="outlined" size="small">
+                <Button startIcon={<NearMeIcon />} onClick={() => mapRef.current?.activateSelect()}>
+                  Single Select
+                </Button>
+                <Button startIcon={<LassoIcon />} onClick={() => mapRef.current?.activateLassoSelect()}>
+                  Lasso Select
+                </Button>
+                <Button
+                  startIcon={<DeleteIcon />}
+                  color="error"
+                  onClick={handleDeleteSelected}
+                >
+                  Delete All
+                </Button>
+                <Button startIcon={<DeleteSweepIcon />} onClick={() => mapRef.current?.deleteSelectedFeatures()}>
+                  Delete Selected
+                </Button>
+                 <Button
+                   startIcon={<UndoIcon />}
+                   onClick={handleUndo}
+                   disabled={annotations.length === 0}
+                 >
+                   Undo
+                 </Button>
+             </ButtonGroup>
           </AccordionDetails>
         </Accordion>
 
@@ -280,30 +285,20 @@ export default function Sidebar({
               <Typography variant="body2" sx={{ mb: 1, fontWeight: 500 }}>
                 Apply Label
               </Typography>
-              <FormControl fullWidth size="small" sx={{ mb: 1 }}>
-                <InputLabel>Current Label</InputLabel>
-                <Select
-                  value={currentLabel}
-                  label="Current Label"
-                  onChange={(e) => setCurrentLabel(e.target.value)}
-                >
-                  {labels.map((label) => (
-                    <MenuItem key={label} value={label}>
-                      {label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={autoLabel}
-                    onChange={(e) => setAutoLabel(e.target.checked)}
-                    size="small"
-                  />
-                }
-                label="Auto-label new objects"
-              />
+               <Autocomplete
+                 freeSolo
+                 options={labels}
+                 value={currentLabel}
+                 onChange={(event, newValue) => {
+                   if (newValue && newValue !== '' && !labels.includes(newValue)) {
+                     setLabels(prev => [...prev, newValue]);
+                   }
+                   setCurrentLabel(newValue || '');
+                 }}
+                 renderInput={(params) => <TextField {...params} label="Current Label" size="small" />}
+                 sx={{ mb: 1 }}
+               />
+
             </Box>
 
             <Box sx={{ mb: 2 }}>
@@ -317,21 +312,31 @@ export default function Sidebar({
                     label={label}
                     size="small"
                     variant={currentLabel === label ? "filled" : "outlined"}
-                    onClick={() => setCurrentLabel(label)}
-                    style={{ backgroundColor: currentLabel === label ? `hsl(${index * 60}, 70%, 80%)` : 'transparent' }}
+                    onClick={() => setCurrentLabel(currentLabel === label ? '' : label)}
+                    onDelete={() => handleDeleteLabel(label)}
+                    style={{ backgroundColor: currentLabel === label ? labelColors[index % labelColors.length] : 'transparent' }}
                   />
                 ))}
               </Box>
             </Box>
 
-            <ButtonGroup orientation="vertical" fullWidth variant="outlined" size="small">
-              <Button startIcon={<FlagIcon />}>
-                Flag Object
-              </Button>
-              <Button startIcon={<NoteIcon />}>
-                Add Text Note
-              </Button>
-            </ButtonGroup>
+             <ButtonGroup orientation="vertical" fullWidth variant="outlined" size="small">
+                <Button startIcon={<LabelIcon />} onClick={() => {
+                  if (currentLabel) {
+                    const index = labels.indexOf(currentLabel);
+                    const color = index === -1 ? '#000000' : labelColors[index % labelColors.length];
+                    mapRef.current?.applyLabelToSelected(currentLabel, color);
+                  }
+                }}>
+                  Apply Label to Selected
+                </Button>
+               <Button startIcon={<FlagIcon />}>
+                 Flag Object
+               </Button>
+               <Button startIcon={<NoteIcon />}>
+                 Add Text Note
+               </Button>
+             </ButtonGroup>
           </AccordionDetails>
         </Accordion>
       </Box>
